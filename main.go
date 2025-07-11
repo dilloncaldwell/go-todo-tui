@@ -313,6 +313,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.mode {
 		case modeList:
+			// Handle space key first, before passing to list
+			if msg.String() == " " {
+				if len(m.todos) > 0 {
+					selectedItem := m.list.SelectedItem()
+					if selectedItem != nil {
+						if todo, ok := selectedItem.(Todo); ok {
+							if err := m.toggleTodo(todo.ID); err != nil {
+								m.message = fmt.Sprintf("Error: %v", err)
+							} else {
+								status := "done"
+								if todo.Done {
+									status = "undone"
+								}
+								m.message = fmt.Sprintf("Marked '%s' as %s", todo.Text, status)
+							}
+						}
+					}
+				}
+				return m, nil
+			}
+
 			switch {
 			case key.Matches(msg, keys.quit):
 				m.quitting = true
