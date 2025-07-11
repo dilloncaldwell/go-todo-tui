@@ -195,7 +195,7 @@ func initDB(dbPath string) (*sql.DB, error) {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		text TEXT NOT NULL,
 		done INTEGER DEFAULT 0,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 	);`
 
 	_, err = db.Exec(query)
@@ -225,7 +225,18 @@ func loadTodos(db *sql.DB) ([]list.Item, error) {
 		}
 
 		todo.Done = done == 1
-		todo.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+		// Try multiple timestamp formats that SQLite might use
+		if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAt); err == nil {
+			todo.CreatedAt = parsedTime
+		} else if parsedTime, err := time.Parse("2006-01-02T15:04:05Z", createdAt); err == nil {
+			todo.CreatedAt = parsedTime
+		} else if parsedTime, err := time.Parse("2006-01-02T15:04:05.000Z", createdAt); err == nil {
+			todo.CreatedAt = parsedTime
+		} else {
+			// If all parsing fails, use current time as fallback
+			todo.CreatedAt = time.Now()
+		}
+
 		todos = append(todos, todo)
 	}
 
