@@ -48,16 +48,27 @@ const (
 	modeDelete
 )
 
+// Filter modes
+type filterMode int
+
+const (
+	filterAll filterMode = iota
+	filterOpen
+	filterCompleted
+)
+
 // Model represents the application state
 type Model struct {
-	db       *sql.DB
-	dbPath   string
-	todos    []list.Item
-	list     list.Model
-	input    textinput.Model
-	mode     mode
-	message  string
-	quitting bool
+	db            *sql.DB
+	dbPath        string
+	todos         []list.Item
+	filteredTodos []list.Item
+	list          list.Model
+	input         textinput.Model
+	mode          mode
+	filter        filterMode
+	message       string
+	quitting      bool
 }
 
 // Key bindings
@@ -67,6 +78,7 @@ type keyMap struct {
 	add     key.Binding
 	delete  key.Binding
 	toggle  key.Binding
+	filter  key.Binding
 	confirm key.Binding
 	cancel  key.Binding
 	quit    key.Binding
@@ -93,6 +105,10 @@ var keys = keyMap{
 	toggle: key.NewBinding(
 		key.WithKeys("t", "space"),
 		key.WithHelp("t/space", "toggle done"),
+	),
+	filter: key.NewBinding(
+		key.WithKeys("f"),
+		key.WithHelp("f", "filter views"),
 	),
 	confirm: key.NewBinding(
 		key.WithKeys("enter"),
@@ -158,6 +174,7 @@ func initialModel(dbPath string) (Model, error) {
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.Styles.Title = titleStyle
+	l.DisableQuitKeybindings()
 
 	// Create text input
 	ti := textinput.New()
@@ -167,12 +184,14 @@ func initialModel(dbPath string) (Model, error) {
 	ti.Width = 50
 
 	return Model{
-		db:     db,
-		dbPath: dbPath,
-		todos:  todos,
-		list:   l,
-		input:  ti,
-		mode:   modeList,
+		db:            db,
+		dbPath:        dbPath,
+		todos:         todos,
+		filteredTodos: todos,
+		list:          l,
+		input:         ti,
+		mode:          modeList,
+		filter:        filterAll,
 	}, nil
 }
 
@@ -189,7 +208,7 @@ func initDB(dbPath string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	// Create table
+	// Create table - use datetime() function for consistent format
 	query := `
 	CREATE TABLE IF NOT EXISTS todos (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -225,6 +244,7 @@ func loadTodos(db *sql.DB) ([]list.Item, error) {
 		}
 
 		todo.Done = done == 1
+
 		// Try multiple timestamp formats that SQLite might use
 		if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAt); err == nil {
 			todo.CreatedAt = parsedTime
@@ -241,6 +261,57 @@ func loadTodos(db *sql.DB) ([]list.Item, error) {
 	}
 
 	return todos, nil
+}
+
+// Filter functions
+func (m *Model) applyFilter() {
+	switch m.filter {
+	case filterAll:
+		m.filteredTodos = m.todos
+		m.list.Title = "📋 Todo List - All"
+	case filterOpen:
+		m.filteredTodos = []list.Item{}
+		for _, item := range m.todos {
+			if todo, ok := item.(Todo); ok && !todo.Done {
+				m.filteredTodos = append(m.filteredTodos, item)
+			}
+		}
+		m.list.Title = "📋 Todo List - Open"
+	case filterCompleted:
+		m.filteredTodos = []list.Item{}
+		for _, item := range m.todos {
+			if todo, ok := item.(Todo); ok && todo.Done {
+				m.filteredTodos = append(m.filteredTodos, item)
+			}
+		}
+		m.list.Title = "📋 Todo List - Completed"
+	}
+	m.list.SetItems(m.filteredTodos)
+}
+
+func (m *Model) cycleFilter() {
+	switch m.filter {
+	case filterAll:
+		m.filter = filterOpen
+	case filterOpen:
+		m.filter = filterCompleted
+	case filterCompleted:
+		m.filter = filterAll
+	}
+	m.applyFilter()
+}
+
+func (m *Model) getFilterStatus() string {
+	switch m.filter {
+	case filterAll:
+		return "All"
+	case filterOpen:
+		return "Open"
+	case filterCompleted:
+		return "Completed"
+	default:
+		return "All"
+	}
 }
 
 func (m *Model) addTodo(text string) error {
@@ -261,7 +332,7 @@ func (m *Model) addTodo(text string) error {
 		return err
 	}
 
-	m.list.SetItems(m.todos)
+	m.applyFilter()
 	return nil
 }
 
@@ -283,7 +354,7 @@ func (m *Model) toggleTodo(id int) error {
 		return err
 	}
 
-	m.list.SetItems(m.todos)
+	m.applyFilter()
 	return nil
 }
 
@@ -305,7 +376,7 @@ func (m *Model) deleteTodo(id int) error {
 		return err
 	}
 
-	m.list.SetItems(m.todos)
+	m.applyFilter()
 	return nil
 }
 
@@ -326,7 +397,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case modeList:
 			// Handle space key first, before passing to list
 			if msg.String() == " " {
-				if len(m.todos) > 0 {
+				if len(m.filteredTodos) > 0 {
 					selectedItem := m.list.SelectedItem()
 					if selectedItem != nil {
 						if todo, ok := selectedItem.(Todo); ok {
@@ -357,8 +428,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.message = ""
 				return m, nil
 
+			case key.Matches(msg, keys.filter):
+				m.cycleFilter()
+				m.message = fmt.Sprintf("Filter: %s", m.getFilterStatus())
+				return m, nil
+
 			case key.Matches(msg, keys.delete):
-				if len(m.todos) > 0 {
+				if len(m.filteredTodos) > 0 {
 					selectedItem := m.list.SelectedItem()
 					if selectedItem != nil {
 						if todo, ok := selectedItem.(Todo); ok {
@@ -370,7 +446,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			case key.Matches(msg, keys.toggle):
-				if len(m.todos) > 0 {
+				if len(m.filteredTodos) > 0 {
 					selectedItem := m.list.SelectedItem()
 					if selectedItem != nil {
 						if todo, ok := selectedItem.(Todo); ok {
@@ -457,7 +533,7 @@ func (m Model) View() string {
 		s.WriteString(m.list.View())
 
 		// Help text
-		help := "\n" + helpStyle.Render("Press 'a' to add, 'd' to delete, 't/space' to toggle, 'q' to quit")
+		help := "\n" + helpStyle.Render("Press 'a' to add, 'd' to delete, 't/space' to toggle, 'f' to filter, 'q' to quit")
 		s.WriteString(help)
 
 	case modeAdd:
