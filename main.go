@@ -36,7 +36,7 @@ func (t Todo) Title() string {
 	return fmt.Sprintf("%s %s", status, t.Text)
 }
 func (t Todo) Description() string {
-	return fmt.Sprintf("ID: %d | Created: %s", t.ID, t.CreatedAt.Format("2006-01-02 15:04"))
+	return fmt.Sprintf("ID: %d | Created: %s", t.ID, t.CreatedAt.Local().Format("2006-01-02 15:04"))
 }
 
 // App modes
@@ -274,26 +274,13 @@ func loadTodos(db *sql.DB) ([]list.Item, error) {
 	for rows.Next() {
 		var todo Todo
 		var done int
-		var createdAt string
 
-		err := rows.Scan(&todo.ID, &todo.Text, &done, &createdAt)
+		err := rows.Scan(&todo.ID, &todo.Text, &done, &todo.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
 
 		todo.Done = done == 1
-
-		// Try multiple timestamp formats that SQLite might use
-		if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAt); err == nil {
-			todo.CreatedAt = parsedTime
-		} else if parsedTime, err := time.Parse("2006-01-02T15:04:05Z", createdAt); err == nil {
-			todo.CreatedAt = parsedTime
-		} else if parsedTime, err := time.Parse("2006-01-02T15:04:05.000Z", createdAt); err == nil {
-			todo.CreatedAt = parsedTime
-		} else {
-			// If all parsing fails, use current time as fallback
-			todo.CreatedAt = time.Now()
-		}
 
 		todos = append(todos, todo)
 	}
