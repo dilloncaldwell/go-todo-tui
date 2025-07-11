@@ -46,6 +46,7 @@ const (
 	modeList mode = iota
 	modeAdd
 	modeDelete
+	modeEdit
 )
 
 // Filter modes
@@ -77,6 +78,7 @@ type keyMap struct {
 	down    key.Binding
 	add     key.Binding
 	delete  key.Binding
+	edit    key.Binding
 	toggle  key.Binding
 	filter  key.Binding
 	confirm key.Binding
@@ -101,6 +103,10 @@ var keys = keyMap{
 	delete: key.NewBinding(
 		key.WithKeys("d"),
 		key.WithHelp("d", "delete task"),
+	),
+	edit: key.NewBinding(
+		key.WithKeys("e"),
+		key.WithHelp("e", "edit task"),
 	),
 	toggle: key.NewBinding(
 		key.WithKeys("t", "space"),
@@ -131,14 +137,14 @@ var keys = keyMap{
 // ShortHelp returns keybindings to be shown in the mini help view. It's part
 // of the key.Map interface.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.add, k.delete, k.toggle, k.filter, k.help, k.quit}
+	return []key.Binding{k.add, k.delete, k.edit, k.toggle, k.filter, k.help, k.quit}
 }
 
 // FullHelp returns keybindings for the expanded help view. It's part of the
 // key.Map interface.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.up, k.down, k.add, k.delete, k.toggle, k.filter, k.help, k.quit}, // first column
+		{k.up, k.down, k.add, k.delete, k.edit, k.toggle, k.filter, k.help, k.quit}, // first column
 	}
 }
 
@@ -193,6 +199,7 @@ func initialModel(dbPath string) (Model, error) {
 		return []key.Binding{
 			keys.add,
 			keys.delete,
+			keys.edit,
 			keys.toggle,
 			keys.filter,
 		}
@@ -201,6 +208,7 @@ func initialModel(dbPath string) (Model, error) {
 		return []key.Binding{
 			keys.add,
 			keys.delete,
+			keys.edit,
 			keys.toggle,
 			keys.filter,
 		}
@@ -410,6 +418,28 @@ func (m *Model) deleteTodo(id int) error {
 	return nil
 }
 
+func (m *Model) editTodo(id int, text string) error {
+	stmt, err := m.db.Prepare("UPDATE todos SET text = ? WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(text, id)
+	if err != nil {
+		return err
+	}
+
+	// Reload todos
+	m.todos, err = loadTodos(m.db)
+	if err != nil {
+		return err
+	}
+
+	m.applyFilter()
+	return nil
+}
+
 // Bubble Tea methods
 func (m Model) Init() tea.Cmd {
 	return nil
@@ -475,6 +505,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 
+			case key.Matches(msg, keys.edit):
+				if len(m.filteredTodos) > 0 {
+					selectedItem := m.list.SelectedItem()
+					if selectedItem != nil {
+						if todo, ok := selectedItem.(Todo); ok {
+							m.mode = modeEdit
+							m.input.SetValue(todo.Text)
+							m.input.Focus()
+							m.message = fmt.Sprintf("Editing '%s'", todo.Text)
+							return m, nil
+						}
+					}
+				}
+
 			case key.Matches(msg, keys.toggle):
 				if len(m.filteredTodos) > 0 {
 					selectedItem := m.list.SelectedItem()
@@ -504,6 +548,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.message = fmt.Sprintf("Error: %v", err)
 					} else {
 						m.message = fmt.Sprintf("Added: %s", text)
+					}
+				}
+				m.mode = modeList
+				return m, nil
+
+			case key.Matches(msg, keys.cancel):
+				m.mode = modeList
+				m.message = ""
+				return m, nil
+			}
+
+		case modeEdit:
+			switch {
+			case key.Matches(msg, keys.confirm):
+				text := strings.TrimSpace(m.input.Value())
+				if text != "" {
+					selectedItem := m.list.SelectedItem()
+					if selectedItem != nil {
+						if todo, ok := selectedItem.(Todo); ok {
+							if err := m.editTodo(todo.ID, text); err != nil {
+								m.message = fmt.Sprintf("Error: %v", err)
+							} else {
+								m.message = fmt.Sprintf("Edited: %s", text)
+							}
+						}
 					}
 				}
 				m.mode = modeList
@@ -546,6 +615,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list, cmd = m.list.Update(msg)
 	case modeAdd:
 		m.input, cmd = m.input.Update(msg)
+	case modeEdit:
+		m.input, cmd = m.input.Update(msg)
 	}
 
 	return m, cmd
@@ -572,7 +643,14 @@ func (m Model) View() string {
 		s.WriteString("\n\n")
 		s.WriteString(helpStyle.Render("Press Enter to add, Esc to cancel"))
 
-	case modeDelete:
+    case modeEdit:
+        s.WriteString(titleStyle.Render("✍️ Edit Task"))
+        s.WriteString("\n\n")
+        s.WriteString(inputStyle.Render(m.input.View()))
+        s.WriteString("\n\n")
+        s.WriteString(helpStyle.Render("Press Enter to save, Esc to cancel"))
+
+    case modeDelete:
 		s.WriteString(titleStyle.Render("🗑️  Delete Task"))
 		s.WriteString("\n\n")
 		s.WriteString(inputStyle.Render(m.message))
