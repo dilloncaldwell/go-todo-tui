@@ -128,6 +128,20 @@ var keys = keyMap{
 	),
 }
 
+// ShortHelp returns keybindings to be shown in the mini help view. It's part
+// of the key.Map interface.
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.add, k.delete, k.toggle, k.filter, k.help, k.quit}
+}
+
+// FullHelp returns keybindings for the expanded help view. It's part of the
+// key.Map interface.
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.up, k.down, k.add, k.delete, k.toggle, k.filter, k.help, k.quit}, // first column
+	}
+}
+
 // Styles
 var (
 	titleStyle = lipgloss.NewStyle().
@@ -175,6 +189,22 @@ func initialModel(dbPath string) (Model, error) {
 	l.SetFilteringEnabled(false)
 	l.Styles.Title = titleStyle
 	l.DisableQuitKeybindings()
+	l.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			keys.add,
+			keys.delete,
+			keys.toggle,
+			keys.filter,
+		}
+	}
+	l.AdditionalFullHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			keys.add,
+			keys.delete,
+			keys.toggle,
+			keys.filter,
+		}
+	}
 
 	// Create text input
 	ti := textinput.New()
@@ -531,11 +561,10 @@ func (m Model) View() string {
 	switch m.mode {
 	case modeList:
 		s.WriteString(m.list.View())
-
-		// Help text
-		help := "\n" + helpStyle.Render("Press 'a' to add, 'd' to delete, 't/space' to toggle, 'f' to filter, 'q' to quit")
-		s.WriteString(help)
-
+		if m.message != "" {
+			s.WriteString("\n")
+			s.WriteString(messageStyle.Render(m.message))
+		}
 	case modeAdd:
 		s.WriteString(titleStyle.Render("📝 Add New Task"))
 		s.WriteString("\n\n")
@@ -547,12 +576,6 @@ func (m Model) View() string {
 		s.WriteString(titleStyle.Render("🗑️  Delete Task"))
 		s.WriteString("\n\n")
 		s.WriteString(inputStyle.Render(m.message))
-	}
-
-	// Show message
-	if m.message != "" && m.mode == modeList {
-		s.WriteString("\n")
-		s.WriteString(messageStyle.Render(m.message))
 	}
 
 	return s.String()
