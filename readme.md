@@ -51,17 +51,26 @@ todo -g
 todo --config ~/work/todos.db
 ```
 
+→/l/pgdn
+←/h/pgup
+
 ### TUI Controls
 
-| key             | action                 |
-| --------------- | ---------------------- |
-| `↑/↓` or `j/k`  | Navigate tasks         |
-| `a`             | Add task               |
-| `d`             | Delete task            |
-| `t` or `space`  | Toggle task completion |
-| `q` or `Ctrl+c` | Quit                   |
-| `enter`         | Confirm action         |
-| `esc`           | Cancel action          |
+| key             | action                     |
+| --------------- | -------------------------- |
+| `↑/↓` or `j/k`  | Navigate tasks             |
+| `←/→` or `h/l`  | Navigate pages of tasks    |
+| `gg`            | Jump to top of list        |
+| `G`             | Jump to bottom of list     |
+| `a`             | Add task                   |
+| `e`             | edit task                  |
+| `d`             | Delete task                |
+| `f`             | Filter task views          |
+| `s`             | Sort tasks (by id or date) |
+| `t` or `space`  | Toggle task completion     |
+| `q` or `Ctrl+c` | Quit                       |
+| `enter`         | Confirm action             |
+| `esc`           | Cancel action              |
 
 ## Database Locations
 
