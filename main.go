@@ -27,14 +27,28 @@ func initialModel(dbPath string) (Model, error) {
 
 	// Create list
 	delegate := list.NewDefaultDelegate()
+	// selected task styles
+	delegate.Styles.SelectedTitle = selectedTitleStyle
+	delegate.Styles.SelectedDesc = selectedDescStyle
+	delegate.Styles.NormalTitle = normalTitleStyle
+	delegate.Styles.NormalDesc = normalDescStyle
+
 	l := list.New([]list.Item{}, delegate, 0, 0)
 	l.Title = "📋 Todo List"
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.Styles.Title = titleStyle
 	l.Styles.HelpStyle = helpStyle
-	l.Styles.StatusBar = helpStyle
+	// Apply your custom help styles to the list's help
+	l.Help.Styles.ShortKey = helpKeyStyle
+	l.Help.Styles.ShortDesc = helpDescStyle
+	l.Help.Styles.ShortSeparator = helpSeparatorStyle
+	l.Help.Styles.FullKey = helpKeyStyle
+	l.Help.Styles.FullDesc = helpDescStyle
+	l.Help.Styles.FullSeparator = helpSeparatorStyle
+
 	l.DisableQuitKeybindings()
+
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			keys.add,
@@ -120,4 +134,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-

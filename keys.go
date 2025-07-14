@@ -1,6 +1,8 @@
 package main
 
-import "github.com/charmbracelet/bubbles/key"
+import (
+	"github.com/charmbracelet/bubbles/key"
+)
 
 // Key bindings
 type keyMap struct {
