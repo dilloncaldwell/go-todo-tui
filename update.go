@@ -11,6 +11,13 @@ import (
 
 // Filter functions
 func (m *Model) refreshListItems() {
+	var selectedID int = -1
+	if m.list.SelectedItem() != nil {
+		if todo, ok := m.list.SelectedItem().(Todo); ok {
+			selectedID = todo.ID
+		}
+	}
+
 	var filtered []list.Item
 	switch m.filter {
 	case filterAll:
@@ -30,7 +37,21 @@ func (m *Model) refreshListItems() {
 	}
 	m.filteredTodos = filtered
 	m.list.SetItems(filtered)
-	if len(filtered) > 0 {
+
+	if selectedID != -1 {
+		foundIndex := -1
+		for i, item := range filtered {
+			if todo, ok := item.(Todo); ok && todo.ID == selectedID {
+				foundIndex = i
+				break
+			}
+		}
+		if foundIndex != -1 {
+			m.list.Select(foundIndex)
+		} else if len(filtered) > 0 {
+			m.list.Select(0)
+		}
+	} else if len(filtered) > 0 {
 		m.list.Select(0)
 	}
 }

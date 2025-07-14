@@ -11,6 +11,8 @@ A beautiful, project-aware terminal user interface (TUI) for managing todo lists
 - ⚡ Fast navigation - Vim-like keybindings (j/k or arrow keys)
 - 🎯 Zero dependencies - Single binary with no external requirements
 
+![](demo.gif)
+
 ## Prerequisites
 
 Go 1.21 or higher
@@ -22,6 +24,7 @@ CGO support (for SQLite)
 git clone https://github.com/dilloncaldwell/go-todo-tui.git
 go mod tidy
 go build -o todo .
+./todo
 ```
 
 ## Install globally
@@ -33,6 +36,13 @@ go install .
 # Make sure ~/go/bin is in your PATH use .zshrc or .bashrc
 echo 'export PATH=$PATH:~/go/bin' >> ~/.zshrc
 source ~/.zshrc
+
+# or i like to do, so i can keep ~/.config/zsh
+echo 'export GOPATH="$XDG_DATA_HOME/go"' >> ~/.zshenv
+echo 'export GOBIN="$GOPATH/bin"' >> ~/.zshenv
+echo 'export PATH="/opt/homebrew/opt/go/bin:$PATH"' >> ~/.zshenv
+echo 'export PATH="$GOBIN:$PATH"' >> ~/.zshenv
+
 ```
 
 ## Usage
