@@ -10,29 +10,33 @@ import (
 )
 
 // Filter functions
-func (m *Model) applyFilter() {
+func (m *Model) refreshListItems() {
+	var filtered []list.Item
 	switch m.filter {
 	case filterAll:
-		m.filteredTodos = m.todos
-		m.list.Title = "📋 Todo List - All"
+		filtered = append([]list.Item(nil), m.todos...)
 	case filterOpen:
-		m.filteredTodos = []list.Item{}
 		for _, item := range m.todos {
 			if todo, ok := item.(Todo); ok && !todo.Done {
-				m.filteredTodos = append(m.filteredTodos, item)
+				filtered = append(filtered, todo)
 			}
 		}
-		m.list.Title = "📋 Todo List - Open"
 	case filterCompleted:
-		m.filteredTodos = []list.Item{}
 		for _, item := range m.todos {
 			if todo, ok := item.(Todo); ok && todo.Done {
-				m.filteredTodos = append(m.filteredTodos, item)
+				filtered = append(filtered, todo)
 			}
 		}
-		m.list.Title = "📋 Todo List - Completed"
 	}
-	m.list.SetItems(m.filteredTodos)
+	m.filteredTodos = filtered
+	m.list.SetItems(filtered)
+	if len(filtered) > 0 {
+		m.list.Select(0)
+	}
+}
+
+func (m *Model) applyFilter() {
+	m.refreshListItems()
 }
 
 func (m *Model) cycleFilter() {
@@ -60,6 +64,37 @@ func (m *Model) getFilterStatus() string {
 	}
 }
 
+// Sort functions
+func (m *Model) applySort() {
+	var err error
+	m.todos, err = loadTodos(m.db, m.sort)
+	if err != nil {
+			m.message = fmt.Sprintf("Error loading todos: %v", err)
+	}
+}
+
+func (m *Model) cycleSort() {
+	switch m.sort {
+	case sortByID:
+		m.sort = sortByCreatedAt
+	case sortByCreatedAt:
+		m.sort = sortByID
+	}
+	m.applySort()
+	m.refreshListItems()
+}
+
+func (m *Model) getSortStatus() string {
+	switch m.sort {
+	case sortByID:
+		return "ID"
+	case sortByCreatedAt:
+		return "Creation Date"
+	default:
+		return "ID"
+	}
+}
+
 func (m Model) Init() tea.Cmd {
 	return nil
 }
@@ -72,6 +107,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// fmt.Printf("DEBUG: Key pressed: %s\n", msg.String())
 		switch m.mode {
 		case modeList:
 			// Handle space key first, before passing to list
@@ -79,17 +115,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.filteredTodos) > 0 {
 					selectedItem := m.list.SelectedItem()
 					if selectedItem != nil {
-						if todo, ok := selectedItem.(Todo); ok {
-							if err := m.toggleTodo(todo.ID); err != nil {
-								m.message = fmt.Sprintf("Error: %v", err)
-							} else {
-								status := "done"
-								if todo.Done {
-									status = "undone"
-								}
-								m.message = fmt.Sprintf("Marked '%s' as %s", todo.Text, status)
+											if todo, ok := selectedItem.(Todo); ok {
+						if err := m.toggleTodo(todo.ID); err != nil {
+							m.message = fmt.Sprintf("Error: %v", err)
+						} else {
+							status := "done"
+							if todo.Done {
+								status = "undone"
 							}
+							m.message = fmt.Sprintf("Marked '%s' as %s", todo.Text, status)
+							var err error
+							m.todos, err = loadTodos(m.db, m.sort)
+							if err != nil {
+								m.message = fmt.Sprintf("Error loading todos: %v", err)
+							}
+							m.refreshListItems()
 						}
+					}
 					}
 				}
 				return m, nil
@@ -105,6 +147,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Reset()
 				m.input.Focus()
 				m.message = ""
+				return m, nil
+
+			case key.Matches(msg, keys.sort):
+				m.cycleSort()
+				m.message = fmt.Sprintf("Sort: %s", m.getSortStatus())
 				return m, nil
 
 			case key.Matches(msg, keys.filter):
@@ -142,17 +189,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.filteredTodos) > 0 {
 					selectedItem := m.list.SelectedItem()
 					if selectedItem != nil {
-						if todo, ok := selectedItem.(Todo); ok {
-							if err := m.toggleTodo(todo.ID); err != nil {
-								m.message = fmt.Sprintf("Error: %v", err)
-							} else {
-								status := "done"
-								if todo.Done {
-									status = "undone"
-								}
-								m.message = fmt.Sprintf("Marked '%s' as %s", todo.Text, status)
+											if todo, ok := selectedItem.(Todo); ok {
+						if err := m.toggleTodo(todo.ID); err != nil {
+							m.message = fmt.Sprintf("Error: %v", err)
+						} else {
+							status := "done"
+							if todo.Done {
+								status = "undone"
 							}
+							m.message = fmt.Sprintf("Marked '%s' as %s", todo.Text, status)
+							var err error
+							m.todos, err = loadTodos(m.db, m.sort)
+							if err != nil {
+								m.message = fmt.Sprintf("Error loading todos: %v", err)
+							}
+							m.refreshListItems()
 						}
+					}
 					}
 				}
 				return m, nil
@@ -167,6 +220,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.message = fmt.Sprintf("Error: %v", err)
 					} else {
 						m.message = fmt.Sprintf("Added: %s", text)
+						var err error
+						m.todos, err = loadTodos(m.db, m.sort)
+						if err != nil {
+							m.message = fmt.Sprintf("Error loading todos: %v", err)
+						}
+						m.refreshListItems()
 					}
 				}
 				m.mode = modeList
@@ -186,10 +245,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					selectedItem := m.list.SelectedItem()
 					if selectedItem != nil {
 						if todo, ok := selectedItem.(Todo); ok {
-							if err := m.editTodo(todo.ID, text); err != nil {
+															if err := m.editTodo(todo.ID, text); err != nil {
 								m.message = fmt.Sprintf("Error: %v", err)
 							} else {
 								m.message = fmt.Sprintf("Edited: %s", text)
+								var err error
+								m.todos, err = loadTodos(m.db, m.sort)
+								if err != nil {
+									m.message = fmt.Sprintf("Error loading todos: %v", err)
+								}
+								m.refreshListItems()
 							}
 						}
 					}
@@ -213,6 +278,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.message = fmt.Sprintf("Error: %v", err)
 						} else {
 							m.message = fmt.Sprintf("Deleted: %s", todo.Text)
+							var err error
+							m.todos, err = loadTodos(m.db, m.sort)
+							if err != nil {
+								m.message = fmt.Sprintf("Error loading todos: %v", err)
+							}
+							m.refreshListItems()
 						}
 					}
 				}

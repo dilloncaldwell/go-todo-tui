@@ -10,6 +10,7 @@ type keyMap struct {
 	delete  key.Binding
 	edit    key.Binding
 	toggle  key.Binding
+	sort    key.Binding
 	filter  key.Binding
 	confirm key.Binding
 	cancel  key.Binding
@@ -20,31 +21,35 @@ type keyMap struct {
 var keys = keyMap{
 	up: key.NewBinding(
 		key.WithKeys("k", "up"),
-		key.WithHelp("↑/k", "move up"),
+		key.WithHelp("↑/k", "up"),
 	),
 	down: key.NewBinding(
 		key.WithKeys("j", "down"),
-		key.WithHelp("↓/j", "move down"),
+		key.WithHelp("↓/j", "down"),
 	),
 	add: key.NewBinding(
 		key.WithKeys("a"),
-		key.WithHelp("a", "add task"),
+		key.WithHelp("a", "add"),
 	),
 	delete: key.NewBinding(
 		key.WithKeys("d"),
-		key.WithHelp("d", "delete task"),
+		key.WithHelp("d", "delete"),
 	),
 	edit: key.NewBinding(
 		key.WithKeys("e"),
-		key.WithHelp("e", "edit task"),
+		key.WithHelp("e", "edit"),
 	),
 	toggle: key.NewBinding(
 		key.WithKeys("t", "space"),
-		key.WithHelp("t/space", "toggle done"),
+		key.WithHelp("t/space", "toggle"),
+	),
+	sort: key.NewBinding(
+		key.WithKeys("s"),
+		key.WithHelp("s", "Sort"),
 	),
 	filter: key.NewBinding(
 		key.WithKeys("f"),
-		key.WithHelp("f", "filter views"),
+		key.WithHelp("f", "filter"),
 	),
 	confirm: key.NewBinding(
 		key.WithKeys("enter"),
@@ -67,13 +72,13 @@ var keys = keyMap{
 // ShortHelp returns keybindings to be shown in the mini help view. It's part
 // of the key.Map interface.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.add, k.delete, k.edit, k.toggle, k.filter, k.help, k.quit}
+	return []key.Binding{k.add, k.delete, k.edit, k.toggle, k.sort, k.filter, k.help, k.quit}
 }
 
 // FullHelp returns keybindings for the expanded help view. It's part of the
 // key.Map interface.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.up, k.down, k.add, k.delete, k.edit, k.toggle, k.filter, k.help, k.quit}, // first column
+		{k.up, k.down, k.add, k.delete, k.edit, k.toggle, k.sort, k.filter, k.help, k.quit}, // first column
 	}
 }

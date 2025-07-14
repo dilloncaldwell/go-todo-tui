@@ -49,6 +49,14 @@ const (
 	filterCompleted
 )
 
+// Sort modes
+type sortMode int
+
+const (
+	sortByID sortMode = iota
+	sortByCreatedAt
+)
+
 // Model represents the application state
 type Model struct {
 	db            *sql.DB
@@ -59,6 +67,7 @@ type Model struct {
 	input         textinput.Model
 	mode          mode
 	filter        filterMode
+	sort          sortMode
 	message       string
 	quitting      bool
 }

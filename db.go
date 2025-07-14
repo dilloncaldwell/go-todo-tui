@@ -38,8 +38,21 @@ func initDB(dbPath string) (*sql.DB, error) {
 	return db, nil
 }
 
-func loadTodos(db *sql.DB) ([]list.Item, error) {
-	rows, err := db.Query("SELECT id, text, done, created_at FROM todos ORDER BY id")
+func loadTodos(db *sql.DB, sort sortMode) ([]list.Item, error) {
+	var query string
+	switch sort {
+	case sortByID:
+		query = "SELECT id, text, done, created_at FROM todos ORDER BY id"
+	case sortByCreatedAt:
+		query = "SELECT id, text, done, created_at FROM todos ORDER BY created_at DESC"
+	default:
+		query = "SELECT id, text, done, created_at FROM todos ORDER BY id"
+	}
+	// fmt.Printf("DEBUG: Executing query: %s with sort mode: %v\n", query, sort)
+	os.Stderr.Sync()
+	rows, err := db.Query(query)
+
+
 	if err != nil {
 		return nil, err
 	}
@@ -75,13 +88,6 @@ func (m *Model) addTodo(text string) error {
 		return err
 	}
 
-	// Reload todos
-	m.todos, err = loadTodos(m.db)
-	if err != nil {
-		return err
-	}
-
-	m.applyFilter()
 	return nil
 }
 
@@ -97,13 +103,6 @@ func (m *Model) toggleTodo(id int) error {
 		return err
 	}
 
-	// Reload todos
-	m.todos, err = loadTodos(m.db)
-	if err != nil {
-		return err
-	}
-
-	m.applyFilter()
 	return nil
 }
 
@@ -119,13 +118,6 @@ func (m *Model) deleteTodo(id int) error {
 		return err
 	}
 
-	// Reload todos
-	m.todos, err = loadTodos(m.db)
-	if err != nil {
-		return err
-	}
-
-	m.applyFilter()
 	return nil
 }
 
@@ -141,12 +133,5 @@ func (m *Model) editTodo(id int, text string) error {
 		return err
 	}
 
-	// Reload todos
-	m.todos, err = loadTodos(m.db)
-	if err != nil {
-		return err
-	}
-
-	m.applyFilter()
 	return nil
 }

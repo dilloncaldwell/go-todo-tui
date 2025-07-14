@@ -20,17 +20,20 @@ func initialModel(dbPath string) (Model, error) {
 		return Model{}, err
 	}
 
-	todos, err := loadTodos(db)
+	todos, err := loadTodos(db, sortByID)
 	if err != nil {
 		return Model{}, err
 	}
 
 	// Create list
-	l := list.New(todos, list.NewDefaultDelegate(), 0, 0)
+	delegate := list.NewDefaultDelegate()
+	l := list.New([]list.Item{}, delegate, 0, 0)
 	l.Title = "📋 Todo List"
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.Styles.Title = titleStyle
+	l.Styles.HelpStyle = helpStyle
+	l.Styles.StatusBar = helpStyle
 	l.DisableQuitKeybindings()
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
@@ -39,6 +42,7 @@ func initialModel(dbPath string) (Model, error) {
 			keys.edit,
 			keys.toggle,
 			keys.filter,
+			keys.sort,
 		}
 	}
 	l.AdditionalFullHelpKeys = func() []key.Binding {
@@ -48,8 +52,11 @@ func initialModel(dbPath string) (Model, error) {
 			keys.edit,
 			keys.toggle,
 			keys.filter,
+			keys.sort,
 		}
 	}
+
+	l.SetItems(append([]list.Item(nil), todos...))
 
 	// Create text input
 	ti := textinput.New()
@@ -62,11 +69,12 @@ func initialModel(dbPath string) (Model, error) {
 		db:            db,
 		dbPath:        dbPath,
 		todos:         todos,
-		filteredTodos: todos,
+		filteredTodos: append([]list.Item(nil), todos...),
 		list:          l,
 		input:         ti,
 		mode:          modeList,
 		filter:        filterAll,
+		sort:          sortByID,
 	}, nil
 }
 
@@ -104,9 +112,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// fmt.Printf("DEBUG: Initial model.sort: %v\n", model.sort)
+	os.Stderr.Sync()
 
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
+
